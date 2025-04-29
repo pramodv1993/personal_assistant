@@ -14,7 +14,7 @@ multidevice: true
 .catch((error)=>console.log(error))
 
 function start(client){
-  const myNumber = "919481809888@c.us"
+  const myNumber = ""
   client.onMessage(async (message)=>{
     console.log(message)
     if (message.body){
