@@ -7,7 +7,7 @@ Designing a trustworthy personal assistant that has access to our private dataâ€
 - The following is a very high level design of the system
 <br>
 <br>
-![Alt text](image.png)
+![Alt text](./image.png)
 <br>
 - I try to use a very simple LLM based agent that has access to different tools to query the respective personal channel.
 - These tools are essentially Retrieval Augumented Systems that query the VecDB to retrieve similar contexts.
