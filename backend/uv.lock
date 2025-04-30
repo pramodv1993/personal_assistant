@@ -38,6 +38,7 @@ dependencies = [
     { name = "langchain-ollama" },
     { name = "langgraph" },
     { name = "mcp", extra = ["cli"] },
+    { name = "ollama" },
 ]
 
 [package.metadata]
@@ -46,6 +47,7 @@ requires-dist = [
     { name = "langchain-ollama", specifier = ">=0.3.2" },
     { name = "langgraph", specifier = ">=0.4.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.6.0" },
+    { name = "ollama", specifier = ">=0.4.8" },
 ]
 
 [[package]]

@@ -9,4 +9,5 @@ dependencies = [
     "langchain-ollama>=0.3.2",
     "langgraph>=0.4.0",
     "mcp[cli]>=1.6.0",
+    "ollama>=0.4.8",
 ]
