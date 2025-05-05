@@ -5,9 +5,22 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "faiss-cpu>=1.11.0",
+    "grandalf>=0.8",
+    "langchain-community>=0.3.23",
     "langchain-mcp-adapters>=0.0.9",
     "langchain-ollama>=0.3.2",
+    "langchain-openai>=0.3.15",
+    "langchain-text-splitters>=0.3.8",
     "langgraph>=0.4.0",
     "mcp[cli]>=1.6.0",
     "ollama>=0.4.8",
+    "pandas>=2.2.3",
+    "qdrant-client>=1.14.2",
+    "tenacity>=9.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
 ]
