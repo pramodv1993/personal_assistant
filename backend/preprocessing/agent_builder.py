@@ -5,11 +5,13 @@ Identify the doc type and invoke the respective processing + ingestion tool
 
 import os
 import re
+import sys
 from itertools import chain
 from typing import Annotated
 from uuid import uuid4
 
 import pandas as pd
+from langchain_core.runnables.config import RunnableConfig
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -19,7 +21,9 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from tenacity import retry, stop_after_attempt
 from typing_extensions import TypedDict
-from utils.qdrant_service import QdrantClient
+
+sys.path.append("..")
+from utils.qdrant_service import QdrantService
 
 
 class State(TypedDict):
@@ -144,7 +148,7 @@ def process_notes(file_path: str):
     return {"messages": ["Processing Done"]}
 
 
-def doc_processor(state: State):
+def doc_processor(state: State, config: RunnableConfig):
     prompt = """You are a document processing assistant. Given a file snippet, carefully analyze the content and select exactly ONE tool that best describes the snippet to processs the document.
     Available tools and their associated tools:
     - `process_chats` to process chat messages
@@ -154,7 +158,13 @@ def doc_processor(state: State):
     ONLY select one tool that best fits the content. Do not call more than one.
     You HAVE to choose one tool.
     """
-    response = openai_gpt_with_tools.invoke(
+    llm = (
+        ollama_with_tools
+        if config["configurable"]["use_cloud_llm"]
+        else openai_with_tools
+    )
+    print(f"Use cloud llm : {config['configurable']['use_cloud_llm']}")
+    response = llm.invoke(
         [
             {"role": "system", "content": prompt},
             {
@@ -182,33 +192,29 @@ def post_process(output: str):
     return output.split("\n\n")[-1]
 
 
-llm = ChatOllama(
-    base_url="http://localhost:7869", model="qwen3:0.6b"
-)  # sel-hosted model
-openai_gpt = ChatOpenAI(model="gpt-3.5-turbo-0125")
-openai_embedding = OpenAIEmbeddings(
-    model="text-embedding-3-small"
-)  # @ TODO change to self hosted embedding model
+openai_embedding = OpenAIEmbeddings(model="text-embedding-3-small")
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=400, chunk_overlap=100, length_function=len, is_separator_regex=False
 )
-qdrant = QdrantClient()
+qdrant = QdrantService()
+ollama = ChatOllama(base_url="http://localhost:7869", model="qwen3:0.6b")
+openai = ChatOpenAI(model="gpt-3.5-turbo-0125")
 tools = [process_chats, process_emails, process_notes]
-openai_gpt_with_tools = openai_gpt.bind_tools(tools, tool_choice="required")
-llm_with_tools = llm.bind_tools(tools, tool_choice="required")
+openai_with_tools = openai.bind_tools(tools, tool_choice="required")
+ollama_with_tools = ollama.bind_tools(tools, tool_choice="required")
 
 
 def construct_data_processing_graph():
     tool_node = ToolNode(tools)
     graph_builder = StateGraph(State)
+    # nodes
     graph_builder.add_node("doc_processor", doc_processor)
     graph_builder.add_node("tool_executor", tool_node)
-
+    # edges
     graph_builder.add_edge(START, "doc_processor")
     graph_builder.add_conditional_edges(
         "doc_processor", node_router, {"tool_executor": "tool_executor", END: END}
     )
-
     graph = graph_builder.compile()
     graph.get_graph().print_ascii()
     return graph
