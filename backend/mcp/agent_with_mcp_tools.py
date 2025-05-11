@@ -23,12 +23,13 @@ def init_llm(use_cloud_llm: bool = True):
 
 @contextlib.asynccontextmanager
 async def connect_to_mcp_server(
-    url: str = "http://localhost:9000/mcp",
-    port: int = 9000,
+    mcp_host: str = "http://localhost",
+    mcp_port: int = 9000,
     transport: Literal["streamable_http", "sse"] = "streamable_http",
 ):
+    url = f"{mcp_host}:{mcp_port}"
     if transport == "sse":
-        url = f"http://localhost:{port}/sse"
+        url += "/sse"
         async with sse_client(url) as (read_stream, write_stream):
             async with ClientSession(
                 read_stream=read_stream, write_stream=write_stream
@@ -36,7 +37,7 @@ async def connect_to_mcp_server(
                 await session.initialize()
                 yield session
     else:
-        url = f"http://localhost:{port}/mcp"
+        url += "/mcp"
         async with streamablehttp_client(url) as (read_stream, write_stream, _):
             async with ClientSession(
                 read_stream=read_stream, write_stream=write_stream
@@ -45,12 +46,19 @@ async def connect_to_mcp_server(
                 yield session
 
 
-async def exec_llm_with_mcp_tools(query: str, llm: Any = None):
+async def exec_llm_with_mcp_tools(
+    query: str,
+    llm: Any = None,
+    mcp_host: str = "http://127.0.0.1",
+    mcp_port: int = 9000,
+):
     if not llm:
         raise Exception("No LLM provided!")
     agent = None
     print("Creating an agent with MCP tools..")
-    async with connect_to_mcp_server(transport="streamable_http") as session:
+    async with connect_to_mcp_server(
+        transport="streamable_http", mcp_host=mcp_host, mcp_port=mcp_port
+    ) as session:
         await session.initialize()
         tools = await load_mcp_tools(session)
         # if same agent needs to reused, then explicitly control the __aenter__ and __aexit__ methods of the session's context manager
@@ -63,5 +71,10 @@ async def exec_llm_with_mcp_tools(query: str, llm: Any = None):
 if __name__ == "__main__":
     llm = init_llm()
     agent = asyncio.run(
-        exec_llm_with_mcp_tools(query="Whats the email content?", llm=llm)
+        exec_llm_with_mcp_tools(
+            query="Whats the email content?",
+            llm=llm,
+            mcp_host="http://127.0.0.1",
+            mcp_port=9000,
+        )
     )

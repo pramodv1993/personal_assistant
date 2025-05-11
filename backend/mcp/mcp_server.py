@@ -27,4 +27,4 @@ async def search_email(query: str):
 if __name__ == "__main__":
     # mcp.run(transport="stdio")
     # mcp.run(transport="sse", host="127.0.0.1", port=9000, path="/sse")
-    asyncio.run(mcp.run_streamable_http_async(host="127.0.0.1", port=9000, path="/mcp"))
+    asyncio.run(mcp.run_streamable_http_async(host="0.0.0.0", port=9000))

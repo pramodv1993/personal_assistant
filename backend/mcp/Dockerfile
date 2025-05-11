@@ -1,7 +1,12 @@
-FROM python:3.13
+FROM python:3.12-slim-bookworm
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 COPY . .
 
-RUN python -m pip install -r requirements.txt
+RUN uv venv
 
-ENTRYPOINT ["python3", "mcp_server.py"]
+RUN uv pip install -r requirements.txt
+
+EXPOSE 9000
+
+ENTRYPOINT ["uv", "run", "mcp_server.py"]
