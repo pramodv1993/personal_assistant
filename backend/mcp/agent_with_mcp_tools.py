@@ -1,20 +1,14 @@
 import asyncio
-from typing import Any
+import contextlib
+from typing import Any, Literal
 
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from mcp import ClientSession
+from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamablehttp_client
-
-"""
-Notes: Ref: https://langchain-ai.github.io/langgraph/agents/mcp/#use-mcp-tools
-If MCP is a webserver
-    If Transport is SSE: use http://127.0.0.1:9000/sse as url
-    If Transport is streamable client, use  http://127.0.0.1:9000/mcp as url
-
-"""
 
 
 def init_llm(use_cloud_llm: bool = True):
@@ -27,34 +21,43 @@ def init_llm(use_cloud_llm: bool = True):
     return llm
 
 
+@contextlib.asynccontextmanager
+async def connect_to_mcp_server(
+    url: str = "http://localhost:9000/mcp",
+    port: int = 9000,
+    transport: Literal["streamable_http", "sse"] = "streamable_http",
+):
+    if transport == "sse":
+        url = f"http://localhost:{port}/sse"
+        async with sse_client(url) as (read_stream, write_stream):
+            async with ClientSession(
+                read_stream=read_stream, write_stream=write_stream
+            ) as session:
+                await session.initialize()
+                yield session
+    else:
+        url = f"http://localhost:{port}/mcp"
+        async with streamablehttp_client(url) as (read_stream, write_stream, _):
+            async with ClientSession(
+                read_stream=read_stream, write_stream=write_stream
+            ) as session:
+                await session.initialize()
+                yield session
+
+
 async def exec_llm_with_mcp_tools(query: str, llm: Any = None):
     if not llm:
         raise Exception("No LLM provided!")
     agent = None
-    # msg = {
-    #     "messages": [
-    #         {
-    #             "role": "user",
-    #             "content": "what is the the notes content for - my secret note",
-    #         }
-    #     ]
-    # }
     print("Creating an agent with MCP tools..")
-    async with streamablehttp_client(url="http://127.0.0.1:9000/mcp") as (
-        read_stream,
-        write_stream,
-        _,
-    ):
-        async with ClientSession(
-            read_stream=read_stream, write_stream=write_stream
-        ) as session:
-            await session.initialize()
-            tools = await load_mcp_tools(session)
-            agent = create_react_agent(
-                llm, tools=tools
-            )  # alternative for creating an agent each time is use use 1 agent that uses the same session each time (where we control the __aenter__ and __aexit__ of the streamable HTTP client)
-            async for event in agent.astream({"messages": query}):
-                print(event)
+    async with connect_to_mcp_server(transport="streamable_http") as session:
+        await session.initialize()
+        tools = await load_mcp_tools(session)
+        agent = create_react_agent(
+            llm, tools=tools
+        )  # alternative for creating an agent each time is use use 1 agent that uses the same session each time (where we control the __aenter__ and __aexit__ of the streamable HTTP client)
+        async for event in agent.astream({"messages": query}):
+            print(event)
     return agent
 
 

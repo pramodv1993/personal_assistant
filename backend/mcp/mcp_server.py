@@ -1,11 +1,8 @@
 import asyncio
 
-# from mcp.server.fastmcp import FastMCP
 from fastmcp import FastMCP
 
 mcp = FastMCP("MCP_PersonalData")
-
-# can add a context to create DB connections - say like FAISS
 
 
 @mcp.tool()
@@ -29,5 +26,5 @@ async def search_email(query: str):
 # can run inspector to explore the tools uysing
 if __name__ == "__main__":
     # mcp.run(transport="stdio")
-    # mcp.run(transport="sse", host="127.0.0.1", port=9000)
-    asyncio.run(mcp.run_streamable_http_async(host="127.0.0.1", port=9000))
+    # mcp.run(transport="sse", host="127.0.0.1", port=9000, path="/sse")
+    asyncio.run(mcp.run_streamable_http_async(host="127.0.0.1", port=9000, path="/mcp"))
