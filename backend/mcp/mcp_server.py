@@ -23,7 +23,7 @@ async def search_email(query: str):
     return "Email: From: xyz@fmail.com Subject: Very Critical issue!"
 
 
-# can run inspector to explore the tools uysing
+# can run inspector to explore the tools using mcp dev mcp_server.py
 if __name__ == "__main__":
     # mcp.run(transport="stdio")
     # mcp.run(transport="sse", host="127.0.0.1", port=9000, path="/sse")
