@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "faiss-cpu>=1.11.0",
+    "fastmcp>=2.3.3",
     "grandalf>=0.8",
     "langchain-community>=0.3.23",
     "langchain-mcp-adapters>=0.0.9",
