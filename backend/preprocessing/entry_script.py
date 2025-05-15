@@ -22,13 +22,12 @@ if __name__ == "__main__":
         default="cloud",
     )
     args = parser.parse_args()
-    use_cloud = True if args.model_type == "cloud" else False
     graph = construct_data_processing_graph()
     data_dir = Path("data/")
     file_names = os.listdir(data_dir)
     for file_name in file_names:
         file_path = data_dir / file_name
-        graph.invoke(
+        for chunk in graph.stream(
             input={
                 "messages": [
                     {
@@ -39,6 +38,7 @@ if __name__ == "__main__":
                                     """,
                     }
                 ]
-            },
-            config={"configurable": {"use_cloud_llm": use_cloud}},
-        )
+            }
+        ):
+            continue
+            # print(chunk)

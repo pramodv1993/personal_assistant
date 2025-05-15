@@ -1,30 +1,29 @@
 import asyncio
 
 from fastmcp import FastMCP
+from utils.configs import MCP_PORT, QDRANT_HOST, QDRANT_PORT, USE_CLOUD
+from utils.factory import get_embedding_model
+from utils.qdrant_service import QdrantService
 
 mcp = FastMCP("MCP_PersonalData")
+qdrant_service = QdrantService(
+    host=f"{QDRANT_HOST}:{QDRANT_PORT}", create_default_collection=False
+)
 
 
 @mcp.tool()
-async def search_watsapp(query: str, start_time: str, end_time: str):
-    "Search personal messages that are relevant to the query which are between start and end times"
-    return "Hello, whats the update on the development?"
-
-
-@mcp.tool()
-async def search_notes(query: str):
-    "Search personal notes for information that are relevant to the query"
-    return f"Response to query {query}: 1. ADD REPO TO GIT 2. CONFIGURE UV 3. HLD of the project"
-
-
-@mcp.tool()
-async def search_email(query: str):
-    "Search personal email for information that are relevant to the query"
-    return "Email: From: xyz@fmail.com Subject: Very Critical issue!"
+async def search_data(query: str):
+    "Search user history to relevant information"
+    data = qdrant_service.get_similar_docs(
+        query,
+        embedding_func=get_embedding_model(USE_CLOUD).embed_documents,
+        collection_name="test",
+    )
+    return "\n\n".join([doc.payload["text"] for doc in data])
 
 
 # can run inspector to explore the tools using mcp dev mcp_server.py
 if __name__ == "__main__":
     # mcp.run(transport="stdio")
     # mcp.run(transport="sse", host="127.0.0.1", port=9000, path="/sse")
-    asyncio.run(mcp.run_streamable_http_async(host="0.0.0.0", port=9000))
+    asyncio.run(mcp.run_streamable_http_async(host="0.0.0.0", port=MCP_PORT))

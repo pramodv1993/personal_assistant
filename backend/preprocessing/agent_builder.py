@@ -13,8 +13,6 @@ from uuid import uuid4
 import pandas as pd
 from langchain_core.runnables.config import RunnableConfig
 from langchain_core.tools import tool
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -23,6 +21,12 @@ from tenacity import retry, stop_after_attempt
 from typing_extensions import TypedDict
 
 sys.path.append("..")
+from utils.configs import (
+    QDRANT_LOCAL_HOST,
+    QDRANT_PORT,
+    USE_CLOUD,
+)
+from utils.factory import get_embedding_model, get_llm
 from utils.qdrant_service import QdrantService
 
 
@@ -31,8 +35,8 @@ class State(TypedDict):
 
 
 @tool
-@retry(stop=stop_after_attempt(3))
-def process_chats(file_path: str):
+@retry(stop=stop_after_attempt(1))
+def process_chats(file_path: str, config: RunnableConfig):
     """Process chat contents"""
 
     def message_formatter(date, msgs):
@@ -41,7 +45,6 @@ def process_chats(file_path: str):
             chats += f"{user}: {msg}\n\n"
         return chats
 
-    qdrant.create_collection("test", 1536, recreate=False)
     if not os.path.exists(file_path):
         return FileNotFoundError("File not found!")
     print(f"Using `process_chats` tool for the file {file_path}")
@@ -73,25 +76,27 @@ def process_chats(file_path: str):
     )
     # @TODO add chunker at some point
     print("Formatted chats..")
-    qdrant.insert_docs(
-        "test",
-        formatted_chats,
-        metadatas=[{"doc_type": "chat"}] * len(formatted_chats),
-        include_doc_in_payload=True,
-        embedding_func=openai_embedding.embed_documents,
-    )
+    try:
+        qdrant.insert_docs(
+            "test",
+            formatted_chats,
+            metadatas=[{"doc_type": "chat"}] * len(formatted_chats),
+            include_doc_in_payload=True,
+            embedding_func=embedding.embed_documents,
+        )
+    except Exception as e:
+        raise Exception("Error while inserting chats", e)
     print("Inserted chats to vec store")
     return {"messages": ["Processing Done"]}
 
 
 @tool
-@retry(stop=stop_after_attempt(3))
-def process_emails(file_path: str):
+@retry(stop=stop_after_attempt(1))
+def process_emails(file_path: str, config: RunnableConfig):
     """Process email contents"""
     if not os.path.exists(file_path):
         return FileNotFoundError("File not found!")
     print(f"Using `process_emails` tool for the file {file_path}")
-    qdrant.create_collection("test", 1536, recreate=False)
     data = open(file_path, "r").read().split("---------------------")
     # mask PIIs
     emails = [
@@ -119,7 +124,7 @@ def process_emails(file_path: str):
     qdrant.insert_docs(
         "test",
         chunked_emails,
-        embedding_func=openai_embedding.embed_documents,
+        embedding_func=embedding.embed_documents,
         metadatas=metadatas,
         include_doc_in_payload=True,
     )
@@ -127,10 +132,9 @@ def process_emails(file_path: str):
 
 
 @tool
-@retry(stop=stop_after_attempt(3))
-def process_notes(file_path: str):
+@retry(stop=stop_after_attempt(1))
+def process_notes(file_path: str, config: RunnableConfig):
     """Process notes, personal memos etc"""
-    qdrant.create_collection("test", 1536, recreate=False)
     if not os.path.exists(file_path):
         return FileNotFoundError("File not found!")
     print(f"Using `process_notes` tool for the file {file_path}")
@@ -140,7 +144,7 @@ def process_notes(file_path: str):
     qdrant.insert_docs(
         collection_name="test",
         docs=chunked_texts,
-        embedding_func=openai_embedding.embed_documents,
+        embedding_func=embedding.embed_documents,
         metadatas=[{"doc_type": "note"}] * len(chunked_texts),
         include_doc_in_payload=True,
     )
@@ -158,13 +162,8 @@ def doc_processor(state: State, config: RunnableConfig):
     ONLY select one tool that best fits the content. Do not call more than one.
     You HAVE to choose one tool.
     """
-    llm = (
-        ollama_with_tools
-        if config["configurable"]["use_cloud_llm"]
-        else openai_with_tools
-    )
-    print(f"Use cloud llm : {config['configurable']['use_cloud_llm']}")
-    response = llm.invoke(
+    global llm_with_tools
+    response = llm_with_tools.invoke(
         [
             {"role": "system", "content": prompt},
             {
@@ -192,19 +191,34 @@ def post_process(output: str):
     return output.split("\n\n")[-1]
 
 
-openai_embedding = OpenAIEmbeddings(model="text-embedding-3-small")
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=400, chunk_overlap=100, length_function=len, is_separator_regex=False
-)
-qdrant = QdrantService()
-ollama = ChatOllama(base_url="http://localhost:7869", model="qwen3:0.6b")
-openai = ChatOpenAI(model="gpt-3.5-turbo-0125")
-tools = [process_chats, process_emails, process_notes]
-openai_with_tools = openai.bind_tools(tools, tool_choice="required")
-ollama_with_tools = ollama.bind_tools(tools, tool_choice="required")
+qdrant = None
+text_splitter = None
+tools = None
+llm_with_tools = None
+embedding = None
+
+
+def init_models():
+    print("Initializing models..")
+    global qdrant, text_splitter, llm_with_tools, tools, embedding
+    tools = [process_chats, process_emails, process_notes]
+    print("Initialized LLM")
+    llm = get_llm(USE_CLOUD, within_container=False)
+    print("Initialized LLM with tools")
+    llm_with_tools = llm.bind_tools(tools, tool_choice="required")
+    print("Initialized embedding model")
+    embedding = get_embedding_model(USE_CLOUD, within_container=False)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=400, chunk_overlap=100, length_function=len, is_separator_regex=False
+    )
+    qdrant = QdrantService(
+        host=f"{QDRANT_LOCAL_HOST}:{QDRANT_PORT}", create_default_collection=True
+    )
 
 
 def construct_data_processing_graph():
+    global tools
+    init_models()
     tool_node = ToolNode(tools)
     graph_builder = StateGraph(State)
     # nodes
@@ -216,5 +230,5 @@ def construct_data_processing_graph():
         "doc_processor", node_router, {"tool_executor": "tool_executor", END: END}
     )
     graph = graph_builder.compile()
-    graph.get_graph().print_ascii()
+    # graph.get_graph().print_ascii()
     return graph

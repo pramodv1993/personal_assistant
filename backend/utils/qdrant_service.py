@@ -5,13 +5,26 @@ from uuid import uuid4
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, models
 
+from utils.configs import EMBEDDING_DIM, QDRANT_HOST
+
 
 class QdrantService:
-    def __init__(self, host="http://localhost:6333") -> None:
+    def __init__(
+        self,
+        host=QDRANT_HOST,
+        create_default_collection: bool = True,
+        embedding_dim: int = EMBEDDING_DIM,
+    ) -> None:
         self.client = QdrantClient(url=host)
+        if create_default_collection and not self.client.collection_exists("test"):
+            print("Creating default collection")
+            self.create_collection("test", embedding_dim, recreate=False)
 
     def create_collection(
-        self, collection_name: str, vector_dim: int = 1536, recreate: bool = True
+        self,
+        collection_name: str,
+        vector_dim: int = EMBEDDING_DIM,
+        recreate: bool = True,
     ):
         # @TODO parametrize other configs
         if self.client.collection_exists("test"):
@@ -21,7 +34,7 @@ class QdrantService:
             else:
                 print("Collection already exists, not creating again")
                 return
-        print("Creating collection")
+        print(f"Creating new collection - {collection_name}")
         return self.client.create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(size=vector_dim, distance=Distance.DOT),
@@ -73,7 +86,3 @@ class QdrantService:
             with_payload=True,
             limit=top_k,
         ).points
-
-
-qdrant = QdrantService()
-qdrant.create_collection("test", 1536)
