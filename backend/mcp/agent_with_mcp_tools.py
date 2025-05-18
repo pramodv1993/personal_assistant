@@ -72,7 +72,7 @@ if __name__ == "__main__":
     llm = init_llm()
     agent = asyncio.run(
         exec_llm_with_mcp_tools(
-            query="Whats the email content?",
+            query="summarize email from Lauren??",
             llm=llm,
             mcp_host="http://127.0.0.1",
             mcp_port=9000,

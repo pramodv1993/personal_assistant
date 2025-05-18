@@ -1,4 +1,5 @@
 # generating synthetic messages, emails, notes
+import sys
 from typing import List
 
 from langchain_core.output_parsers import PydanticOutputParser
@@ -6,13 +7,16 @@ from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+sys.path.append("..")
+from utils.configs import OPENAI_KEY, OPENAI_LLM
+
 
 class Message(BaseModel):
     messages: List[str] = Field(description="List of 20 messages")
 
 
 op_parser = PydanticOutputParser(pydantic_object=Message)
-openai_gpt = ChatOpenAI(model="gpt-3.5-turbo-0125")
+openai_gpt = ChatOpenAI(model=OPENAI_LLM, api_key=OPENAI_KEY)
 
 
 def dump_res(data, op_path: str):
