@@ -2,7 +2,7 @@
 This project is a demo on how we can design, implement and host a personal WhatsApp based assistant. It explores the idea of an LLM powered agent that intelligently processes document categories based on its content and make them available for querying. The documents are then made searchable via a vector store via a Model Context Protocol (MCP) based server. All the services are exposed as self-hosted containers.
 
 ### High Level Design
-<br><img src="./design.png" alt="drawing" width="500"/><br>
+<br><img src="./design.png" alt="drawing" width="900"/><br>
 
 
 As seen above it has 2 workflows - one to process different types of documents using appropriate tools, the other workflow is the actually app which consumes the documents.
