@@ -49,3 +49,5 @@ node app.js
 - May be more powerful self-hosted LLMs and embedding models can also be integrated.
 - Add support for more modalities such as images.
 
+Note: To get deeper insights about the project, do check out the article I wrote where I use this repo as a running example :) [here](https://medium.com/@pramodv1993/my-journey-in-designing-and-developing-a-whatsapp-powered-personal-assistant-778fb0eea9b6)
+
